@@ -35,7 +35,12 @@ app.use(cors({ origin: "*" }));
 // Serve static files from public (includes Swagger assets and index.html)
 app.use(express.static(path.join(__dirname, "..", "public")));
 
-// Swagger configuration
+// Swagger configuration - use built JS files for production
+const isProduction = process.env.NODE_ENV === "production" || !process.env.TS_NODE;
+const swaggerApiPaths = isProduction
+  ? ["./build/src/routes/*.js", "./build/src/swagger/*.js"]
+  : ["./src/routes/*.ts", "./src/swagger/*.ts", "./src/models/*.ts"];
+
 const swaggerOptions = {
   definition: {
     openapi: "3.0.0",
@@ -65,19 +70,19 @@ const swaggerOptions = {
       { name: "MissAv" },
     ],
   },
-  apis: ["./src/routes/*.ts", "./src/swagger/*.ts", "./src/models/*.ts"],
+  apis: swaggerApiPaths,
 };
 
 const swaggerDocs = swaggerJsdoc(swaggerOptions);
 
+const swaggerCssPath = path.join(__dirname, "..", "public", "swagger-custom.css");
+const customCss = `${theme.getBuffer(SwaggerThemeNameEnum.DRACULA)}\n${
+  fs.existsSync(swaggerCssPath) ? fs.readFileSync(swaggerCssPath, "utf8") : ""
+}`;
+
 const swaggerUiOptions = {
   customSiteTitle: "AdultColony API Documentation",
-  customCss: `${theme.getBuffer(
-    SwaggerThemeNameEnum.DRACULA
-  )}\n${fs.readFileSync(
-    path.join(__dirname, "..", "public", "swagger-custom.css"),
-    "utf8"
-  )}`,
+  customCss,
   customfavIcon: "/favicon.ico",
   swaggerOptions: {
     filter: true,
@@ -139,11 +144,10 @@ app.get("/", (req, res) => {
 app.get("/api/stats", slow, limiter, async (req, res) => {
   const systemInfo = {
     success: true,
-    playground: `http://adultcolony.site/docs`,
+    playground: `https://${req.headers.host}/docs`,
     date: new Date().toLocaleString(),
     rss: adultcolony.currentProccess().rss,
     heap: adultcolony.currentProccess().heap,
-    server: await adultcolony.getServer(),
     version: pkg.version,
   };
 
@@ -190,8 +194,13 @@ app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
   });
 });
 
-// Start the server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`✅ ${pkg.name} is running at http://localhost:${PORT}`);
-});
+// Start the server only when NOT running on Vercel
+if (process.env.VERCEL !== "1") {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`✅ ${pkg.name} is running at http://localhost:${PORT}`);
+  });
+}
+
+// Export app for Vercel serverless
+export default app;
