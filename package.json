@@ -5,7 +5,7 @@
   "main": "build/src/index.js",
   "type": "commonjs",
   "scripts": {
-    "build": "rimraf build && tsc && cpy \"public/**/*\" build/public --parents",
+    "build": "rimraf build && tsc && node -e \"require('fs').cpSync('public', 'build/public', {recursive: true})\"",
     "start": "node build/src/index.js",
     "start:prod": "npm run build && npm run start",
     "start:dev": "tsx watch src/index.ts"
